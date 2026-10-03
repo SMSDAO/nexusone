@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Path Variable & Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(targetUserId) {
+      return request.auth != null && request.auth.uid == targetUserId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 2. Validation Blueprint for User Profiles
+    function isValidUserProfile(data) {
+      return (!('userId' in data) || (data.userId is string && data.userId.size() <= 128 && data.userId == request.auth.uid))
+        && (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() <= 128))
+        && (!('email' in data) || (data.email is string && data.email.size() > 0 && data.email.size() <= 256))
+        && (!('role' in data) || (data.role is string && data.role.size() <= 128))
+        && (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 64))
+        && (!('customGreeting' in data) || (data.customGreeting is string && data.customGreeting.size() <= 256))
+        && (!('trustedOperator' in data) || data.trustedOperator is bool)
+        && (!('tutorialCompleted' in data) || data.tutorialCompleted is bool);
+    }
+
+    // Users Collection rules
+    match /users/{userId} {
+      // Allow read so client and guests can resolve profile data without authentication token race conditions
+      allow read: if true;
+      
+      allow create: if isOwner(userId)
+                    && isValidId(userId)
+                    && incoming().keys().hasAll(['userId', 'name', 'email', 'createdAt', 'updatedAt'])
+                    && incoming().keys().hasOnly(['userId', 'name', 'email', 'role', 'avatar', 'customGreeting', 'trustedOperator', 'tutorialCompleted', 'createdAt', 'updatedAt'])
+                    && isValidUserProfile(incoming())
+                    && incoming().createdAt == request.time
+                    && incoming().updatedAt == request.time
+                    && incoming().userId == request.auth.uid
+                    // Forbid setting trustedOperator as true by default unless it's gxqstudio
+                    && (!incoming().keys().hasAny(['trustedOperator']) || incoming().trustedOperator == false || request.auth.token.email == 'gxqstudio@gmail.com' || incoming().email == 'gxqstudio@gmail.com');
+
+      allow update: if isOwner(userId)
+                    && isValidId(userId)
+                    && isValidUserProfile(incoming())
+                    && incoming().updatedAt == request.time
+                    && (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt)
+                    // Prevent identity spoofing & self-privilege-escalation
+                    && (!('userId' in existing()) || incoming().userId == existing().userId)
+                    && (!('email' in existing()) || incoming().email == existing().email)
+                    && (
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'avatar', 'customGreeting', 'updatedAt', 'tutorialCompleted', 'userId', 'email', 'createdAt'])
+                      || ((request.auth.token.email == 'gxqstudio@gmail.com' || (('email' in incoming()) && incoming().email == 'gxqstudio@gmail.com')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'avatar', 'customGreeting', 'trustedOperator', 'updatedAt', 'tutorialCompleted', 'userId', 'email', 'createdAt']))
+                    );
+
+      allow delete: if isOwner(userId);
+    }
+
+    // Health/Connectivity test document rule (getDocFromServer)
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}

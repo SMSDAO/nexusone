@@ -1,0 +1,8 @@
+{
+  "name": "NEXUS/ONE",
+  "description": "Infinite Command Center and sandbox simulator for Windows Puppeteer agentic automation and local GGUF models.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

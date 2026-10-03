@@ -1,0 +1,28 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with name, email, role/tier and general settings inside NEXUS/ONE.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The firebase auth user unique identifier." },
+        "name": { "type": "string", "description": "Display name of the operator." },
+        "email": { "type": "string", "description": "Registered email of the user." },
+        "role": { "type": "string", "description": "Aesthetic role under NEXUS/ONE (e.g. System Architect, AI Operator)." },
+        "avatar": { "type": "string", "description": "Emoji avatar character for the operator." },
+        "trustedOperator": { "type": "boolean", "description": "Indicates if user has full clearance." },
+        "customGreeting": { "type": "string", "description": "Customized slogan or command-greeting line." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when this profile is forged." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of last edit." },
+        "tutorialCompleted": { "type": "boolean", "description": "Indicates if the user has evaluated the mandatory introductory tutorial." }
+      },
+      "required": ["userId", "name", "email", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores security-cleared Operator profile and clearance attributes."
+    }
+  }
+}
