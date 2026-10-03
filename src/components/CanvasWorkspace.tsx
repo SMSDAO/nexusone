@@ -112,10 +112,147 @@ export default function CanvasWorkspace({
     research: { open: false, x: 500, y: 350, zIndex: 9 },
     creativeSynth: { open: false, x: 300, y: 150, zIndex: 12 },
     taskTrend: { open: true, x: 620, y: 440, zIndex: 13 },
-    systemHealth: { open: true, x: 340, y: 200, zIndex: 14 }
+    systemHealth: { open: true, x: 340, y: 200, zIndex: 14 },
+    macros: { open: true, x: 260, y: 100, zIndex: 15 }
   });
 
-  const [topZ, setTopZ] = useState(15);
+  const [topZ, setTopZ] = useState(16);
+
+  // ==========================================
+  // Puppeteer Macros State & Handlers
+  // ==========================================
+  interface Macro {
+    id: string;
+    name: string;
+    description: string;
+    steps: PuppetStep[];
+    isPreset?: boolean;
+  }
+
+  const [macros, setMacros] = useState<Macro[]>(() => {
+    try {
+      const saved = localStorage.getItem("nexus_puppeteer_macros");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      // Storage fallback
+    }
+    return [
+      {
+        id: "macro_preset_1",
+        name: "✨ Organize Downloads Stream",
+        description: "Sequentially scans downloads, relocates xlsx/docx file blocks to secure Documents storage.",
+        isPreset: true,
+        steps: [
+          { action: "MouseMove", target: "C:\\Users\\NexusUser\\Downloads", details: "Scans downloads folder" },
+          { action: "MouseClick", target: "downloads_list_view", details: "Selects file stream" },
+          { action: "FileOperation", target: "pitch_draft.docx", details: "Relocates file to Documents" },
+          { action: "KeyboardType", target: "mv pitch_draft.docx Documents/", details: "Flashes sync signals" }
+        ]
+      },
+      {
+        id: "macro_preset_2",
+        name: "🛡️ Sandbox Penetration Scan",
+        description: "Launches Task Watchdog, verifies model backend socket port, logs findings to auditor.",
+        isPreset: true,
+        steps: [
+          { action: "FindAndClick", target: "Task Watchdog Button", details: "Opens hardware registers" },
+          { action: "MouseMove", target: "System Port 8765", details: "Verifies model socket" },
+          { action: "KeyboardType", target: "netstat -an | grep 8765", details: "Checks telemetry channels" },
+          { action: "FileOperation", target: "C:\\Users\\NexusUser\\Desktop\\network_scan.log", details: "Compiles trace file" }
+        ]
+      },
+      {
+        id: "macro_preset_3",
+        name: "💾 Secure Document Backup",
+        description: "Compiles local spreadsheet sheets, creates compressed zip archives, and secures to cold vaults.",
+        isPreset: true,
+        steps: [
+          { action: "MouseMove", target: "C:\\Users\\NexusUser\\Desktop", details: "Moves pointer to Desktop" },
+          { action: "MouseClick", target: "report.xlsx", details: "Grabs core data sheet" },
+          { action: "FileOperation", target: "report_backup.zip", details: "Flushes compression block" },
+          { action: "KeyboardType", target: "zip -r backup.zip Desktop/", details: "Finalizes archiving" }
+        ]
+      }
+    ];
+  });
+
+  const [newMacroName, setNewMacroName] = useState("");
+  const [newMacroDesc, setNewMacroDesc] = useState("");
+  const [newMacroSteps, setNewMacroSteps] = useState<PuppetStep[]>([]);
+  const [newStepAction, setNewStepAction] = useState("MouseMove");
+  const [newStepTarget, setNewStepTarget] = useState("");
+  const [newStepDetails, setNewStepDetails] = useState("");
+  const [isCreatingMacro, setIsCreatingMacro] = useState(false);
+  const [macroSuccessMessage, setMacroSuccessMessage] = useState("");
+
+  const handleRunMacro = async (macro: Macro) => {
+    const plan: PuppetPlan = {
+      plan_type: "Macro Execution",
+      steps: macro.steps,
+      safety_level: "Medium",
+      requires_confirmation: false,
+      ai_response_text: `Executing user-defined macro: ${macro.name}`
+    };
+    // Bring visualizer window to the front and open it so user sees automation path in real-time
+    setWindows(prev => ({
+      ...prev,
+      puppetScreen: { ...prev.puppetScreen, open: true }
+    }));
+    setTimeout(() => {
+      bringToFront("puppetScreen");
+    }, 50);
+    await runCursorSimulation(plan);
+  };
+
+  const handleAddStepToMacro = () => {
+    if (!newStepTarget.trim()) return;
+    const step: PuppetStep = {
+      action: newStepAction,
+      target: newStepTarget.trim(),
+      details: newStepDetails.trim() || undefined
+    };
+    setNewMacroSteps([...newMacroSteps, step]);
+    setNewStepTarget("");
+    setNewStepDetails("");
+  };
+
+  const handleRemoveStepFromMacro = (index: number) => {
+    setNewMacroSteps(newMacroSteps.filter((_, i) => i !== index));
+  };
+
+  const handleSaveMacro = () => {
+    if (!newMacroName.trim() || newMacroSteps.length === 0) return;
+    const newMacro: Macro = {
+      id: `macro_custom_${Date.now()}`,
+      name: newMacroName.trim(),
+      description: newMacroDesc.trim() || "User defined custom automation sequence",
+      steps: newMacroSteps
+    };
+    const updated = [...macros, newMacro];
+    setMacros(updated);
+    try {
+      localStorage.setItem("nexus_puppeteer_macros", JSON.stringify(updated));
+    } catch (e) {
+      // Ignore storage limit errors
+    }
+
+    setNewMacroName("");
+    setNewMacroDesc("");
+    setNewMacroSteps([]);
+    setIsCreatingMacro(false);
+    setMacroSuccessMessage("Macro registered successfully!");
+    setTimeout(() => setMacroSuccessMessage(""), 3000);
+  };
+
+  const handleDeleteMacro = (id: string) => {
+    const updated = macros.filter(m => m.id !== id);
+    setMacros(updated);
+    try {
+      localStorage.setItem("nexus_puppeteer_macros", JSON.stringify(updated));
+    } catch (e) {
+      // Ignore storage errors
+    }
+  };
 
   const [healthData, setHealthData] = useState<{time: string, cpu: number, memory: number}[]>(() => {
     return Array.from({length: 15}).map((_, i) => ({
@@ -534,6 +671,18 @@ export default function CanvasWorkspace({
           id="btn-toggle-system-health"
         >
           System Health
+        </button>
+
+        <button
+          onClick={() => toggleWindow("macros")}
+          className={`px-3 py-1 text-xs font-sans rounded-xl cursor-pointer select-none border transition-all h-8 ${
+            windows.macros.open
+              ? "bg-amber-600 border-amber-400 text-white"
+              : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+          }`}
+          id="btn-toggle-macros"
+        >
+          Automated Macros
         </button>
 
         <div className="w-[1px] h-6 bg-slate-800 shrink-0" />
@@ -1478,6 +1627,289 @@ export default function CanvasWorkspace({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ========================================================= */}
+      {/* Draggable Window 8: Puppeteer Macros Manager */}
+      {/* ========================================================= */}
+      {windows.macros.open && (
+        <motion.div
+          drag
+          dragMomentum={false}
+          onDragStart={() => bringToFront("macros")}
+          className="absolute w-[580px] h-[480px] bg-slate-950/90 border border-slate-800 rounded-2xl overflow-hidden glass-panel flex flex-col shadow-[0_20px_50px_rgba(245,158,11,0.15)] animate-in fade-in-50"
+          style={{ x: windows.macros.x, y: windows.macros.y, zIndex: windows.macros.zIndex }}
+          id="window-puppeteer-macros"
+        >
+          {/* Header Bar */}
+          <div className="h-11 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 cursor-move select-none">
+            <div className="flex items-center gap-2">
+              <Binary className="w-4 h-4 text-amber-500" />
+              <span className="font-display font-semibold text-xs text-slate-200">
+                Puppeteer Automated Macros
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIsCreatingMacro(!isCreatingMacro)}
+                className="p-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-amber-400 hover:text-white rounded-lg cursor-pointer flex items-center gap-1 transition"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{isCreatingMacro ? "View Macros" : "Create Macro"}</span>
+              </button>
+              <button
+                onClick={() => toggleWindow("macros")}
+                className="text-slate-400 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                id="btn-macros-close"
+              >
+                <Maximize2 className="w-3.5 h-3.5 scale-90" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body Area */}
+          <div className="flex-1 p-4 flex flex-col overflow-y-auto scrollbar-thin">
+            {macroSuccessMessage && (
+              <div className="p-2 mb-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs rounded-xl font-mono text-center">
+                ✔ {macroSuccessMessage}
+              </div>
+            )}
+
+            {!isCreatingMacro ? (
+              <div className="flex-1 flex flex-col gap-4">
+                <div className="text-left">
+                  <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest block">
+                    OPERATIONAL CONTROL PANEL
+                  </span>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Execute pre-programmed Puppeteer mouse paths, clicks, and keyboard inputs with a single click.
+                  </p>
+                </div>
+
+                <div className="flex-1 space-y-3 overflow-y-auto max-h-[340px] pr-1 scrollbar-thin">
+                  {macros.map((macro) => (
+                    <div
+                      key={macro.id}
+                      className="p-3 bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 rounded-2xl flex items-center justify-between gap-4 transition"
+                    >
+                      <div className="flex-1 text-left space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white font-display">
+                            {macro.name}
+                          </span>
+                          {macro.isPreset && (
+                            <span className="text-[8px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1 rounded uppercase tracking-wider">
+                              Preset System
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                          {macro.description}
+                        </p>
+                        
+                        {/* unboxed metadata list with separators */}
+                        <div className="flex items-center gap-2 text-[9px] font-mono text-slate-500 pt-0.5">
+                          <span>Steps: {macro.steps.length}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="truncate max-w-[280px]">
+                            Sequence: {macro.steps.map(s => s.action).join(" ➔ ")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleRunMacro(macro)}
+                          disabled={isAnimatingCursor}
+                          className={`p-2.5 rounded-xl flex items-center justify-center cursor-pointer transition ${
+                            isAnimatingCursor
+                              ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                              : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/10"
+                          }`}
+                          title="Execute Puppeteer macro sequence"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        </button>
+
+                        {!macro.isPreset && (
+                          <button
+                            onClick={() => handleDeleteMacro(macro.id)}
+                            className="p-2.5 bg-slate-900 hover:bg-red-950 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-900 rounded-xl cursor-pointer transition"
+                            title="Delete custom macro"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {macros.length === 0 && (
+                    <div className="text-center py-8 text-slate-500 text-xs font-sans">
+                      No macros configured. Click "Create Macro" to build your first automation loop!
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Macro Creator Panel
+              <div className="space-y-4 text-left">
+                <div className="border-b border-slate-800 pb-3">
+                  <span className="text-[9px] font-mono font-bold text-amber-400 uppercase tracking-widest block">
+                    PUPPETEER SEQUENCE CREATOR
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-1 font-display">
+                    Forge Custom Automation Loop
+                  </h3>
+                </div>
+
+                {/* Name & Desc Inputs */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Macro Name</label>
+                    <input
+                      type="text"
+                      value={newMacroName}
+                      onChange={(e) => setNewMacroName(e.target.value)}
+                      placeholder="e.g., Deploy App Loop"
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-500/40 rounded-xl p-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Description</label>
+                    <input
+                      type="text"
+                      value={newMacroDesc}
+                      onChange={(e) => setNewMacroDesc(e.target.value)}
+                      placeholder="Runs compile, organizes outputs"
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-amber-500/40 rounded-xl p-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Step Builder Row */}
+                <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-2xl space-y-3">
+                  <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
+                    Configure Sequence Step
+                  </span>
+                  
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-4 space-y-1">
+                      <label className="text-[8px] font-mono text-slate-500 block uppercase">Action Type</label>
+                      <select
+                        value={newStepAction}
+                        onChange={(e) => setNewStepAction(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-850 hover:border-slate-700 rounded-lg p-1.5 text-[10px] text-slate-300 focus:outline-none"
+                      >
+                        <option value="MouseMove">MouseMove</option>
+                        <option value="MouseClick">MouseClick</option>
+                        <option value="FindAndClick">FindAndClick</option>
+                        <option value="KeyboardType">KeyboardType</option>
+                        <option value="FileOperation">FileOperation</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-4 space-y-1">
+                      <label className="text-[8px] font-mono text-slate-500 block uppercase">Target Object</label>
+                      <input
+                        type="text"
+                        value={newStepTarget}
+                        onChange={(e) => setNewStepTarget(e.target.value)}
+                        placeholder="e.g., compiler_output.log"
+                        className="w-full bg-slate-950 border border-slate-850 focus:border-amber-500/30 rounded-lg p-1.5 text-[10px] text-white focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-4 space-y-1">
+                      <label className="text-[8px] font-mono text-slate-500 block uppercase">Details / Notes</label>
+                      <input
+                        type="text"
+                        value={newStepDetails}
+                        onChange={(e) => setNewStepDetails(e.target.value)}
+                        placeholder="e.g., Grabs log path"
+                        className="w-full bg-slate-950 border border-slate-850 focus:border-amber-500/30 rounded-lg p-1.5 text-[10px] text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddStepToMacro}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Step to Sequence</span>
+                  </button>
+                </div>
+
+                {/* Staged steps sequence trail */}
+                <div className="space-y-2">
+                  <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest block">
+                    Staged Sequence Loop ({newMacroSteps.length} steps)
+                  </span>
+                  
+                  <div className="bg-slate-950 border border-slate-900 rounded-xl p-2.5 max-h-28 overflow-y-auto space-y-1.5 scrollbar-thin">
+                    {newMacroSteps.map((step, index) => (
+                      <div key={index} className="flex items-center justify-between gap-2 font-mono text-[10px] text-slate-300 border-b border-slate-900 pb-1.5 last:border-0 last:pb-0">
+                        <div className="flex gap-1.5 items-center">
+                          <span className="text-amber-500 font-bold">[{index + 1}]</span>
+                          <span className="text-white font-semibold">{step.action}:</span>
+                          <span className="text-slate-400">{step.target}</span>
+                          {step.details && (
+                            <span className="text-[9px] text-slate-500 italic">({step.details})</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStepFromMacro(index)}
+                          className="text-[9px] text-red-400 hover:text-red-300 bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded cursor-pointer transition"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {newMacroSteps.length === 0 && (
+                      <p className="text-[10px] text-slate-500 italic font-sans py-2 text-center">
+                        No steps configured yet. Use the block builder above to chain operations!
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 justify-end pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewMacroName("");
+                      setNewMacroDesc("");
+                      setNewMacroSteps([]);
+                      setIsCreatingMacro(false);
+                    }}
+                    className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl text-xs font-mono font-semibold cursor-pointer transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveMacro}
+                    disabled={!newMacroName.trim() || newMacroSteps.length === 0}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                      !newMacroName.trim() || newMacroSteps.length === 0
+                        ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-850"
+                        : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/10"
+                    }`}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Save & Register Macro</span>
+                  </button>
+                </div>
+
+              </div>
+            )}
           </div>
         </motion.div>
       )}
